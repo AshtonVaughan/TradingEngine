@@ -1,0 +1,300 @@
+# TradingEngine: Extreme-Profit DRL FOREX Scalping Bot Configuration
+
+# Trading Pairs
+trading:
+  pairs:
+    - "EURUSD"
+    - "GBPUSD"
+    - "USDJPY"
+  timeframe: "M1"  # 1-minute bars for scalping
+
+  # Trading sessions (UTC)
+  sessions:
+    asian:
+      start: "00:00"
+      end: "09:00"
+    london:
+      start: "08:00"
+      end: "17:00"
+    new_york:
+      start: "13:00"
+      end: "22:00"
+    # Priority session (London/NY overlap - most liquid)
+    priority:
+      start: "13:00"
+      end: "17:00"
+
+  # Avoid trading
+  avoid:
+    - "friday_20:00+"  # Weekend risk
+    - "news_events"    # High volatility spikes
+
+# Data Collection
+data:
+  # Historical data for training
+  start_date: "2021-01-01"  # 3+ years
+  end_date: "2024-12-31"
+
+  # MT5 connection
+  mt5:
+    login: null  # Set in mt5_config.yaml or environment variable
+    password: null
+    server: null
+    path: "C:\\Program Files\\MetaTrader 5\\terminal64.exe"  # Adjust for your system
+
+  # Data storage
+  raw_data_dir: "data/raw"
+  processed_data_dir: "data/processed"
+
+  # Validation split
+  train_pct: 0.70
+  val_pct: 0.15
+  test_pct: 0.15
+
+# Feature Engineering (100+ features)
+features:
+  lookback_bars: 60  # State includes last 60 M1 bars
+
+  # Price features
+  price:
+    returns: [1, 5, 10, 20, 60]  # Multiple return periods
+    volatility: [10, 20, 60]
+    vwap: [10, 20, 60]
+
+  # Technical indicators
+  indicators:
+    rsi: [14, 21]
+    macd: {fast: 12, slow: 26, signal: 9}
+    bollinger: {period: 20, std: 2.0}
+    atr: [14]
+    stochastic: {k: 14, d: 3, smooth: 3}
+    adx: 14
+    ema: [9, 21, 50, 200]
+    sma: [20, 50]
+
+  # Order flow (if tick data available)
+  orderflow:
+    enabled: false  # Enable if you have tick data
+    spread: true
+    volume_delta: true
+    order_imbalance: true
+
+  # Market microstructure
+  microstructure:
+    bid_ask_spread: true
+    tick_volume: true
+    quote_intensity: false  # Requires tick data
+
+# Reinforcement Learning
+rl:
+  # Algorithm
+  algorithm: "PPO"  # Proximal Policy Optimization
+
+  # State space
+  state_dim: 120  # Will be auto-calculated based on features
+
+  # Action space
+  actions:
+    discrete: ["BUY", "SELL", "CLOSE_ALL", "HOLD"]
+    continuous:
+      position_size:
+        min: 0.01
+        max: 10.0  # Max 10 lots (aggressive)
+      stop_loss_pips:
+        min: 5
+        max: 50
+      take_profit_pips:
+        min: 10
+        max: 150
+
+  # PPO Hyperparameters
+  ppo:
+    learning_rate: 3.0e-4
+    n_steps: 2048  # Steps per environment before update
+    batch_size: 256
+    n_epochs: 10  # Training epochs per update
+    gamma: 0.99  # Discount factor
+    gae_lambda: 0.95  # Advantage estimation
+    clip_range: 0.2
+    clip_range_vf: null  # No value function clipping
+    ent_coef: 0.01  # Entropy bonus (exploration)
+    vf_coef: 0.5  # Value function coefficient
+    max_grad_norm: 0.5  # Gradient clipping
+
+  # Network architecture
+  network:
+    actor:
+      lstm_hidden: 1024
+      lstm_layers: 8
+      transformer_heads: 12
+      transformer_layers: 12
+      d_model: 768
+      dropout: 0.1
+    critic:
+      dual_critics: true  # Reduce overestimation
+      hidden_size: 1024
+      num_layers: 6
+
+# H200 NVL Optimizations
+h200:
+  # Parallel environments
+  num_envs: 128  # Massive parallelization (139GB VRAM)
+
+  # Training settings
+  use_bfloat16: true  # H200 native precision
+  pin_memory: true
+
+  # Replay buffer (GPU-resident)
+  replay_buffer_size: 10_000_000  # 10M transitions
+  buffer_on_gpu: true
+
+  # Model compilation
+  use_torch_compile: true
+  compile_mode: "reduce-overhead"
+
+  # Checkpointing
+  checkpoint_freq: 10_000_000  # Every 10M steps
+  save_top_k: 5  # Keep best 5 checkpoints
+
+# Training Strategy
+training:
+  # Total training steps
+  total_timesteps: 100_000_000  # 100M steps
+
+  # Curriculum learning
+  curriculum:
+    enabled: true
+    stages:
+      - name: "calm"
+        volatility_percentile: [0, 20]
+        duration_steps: 20_000_000
+      - name: "normal"
+        volatility_percentile: [20, 80]
+        duration_steps: 30_000_000
+      - name: "volatile"
+        volatility_percentile: [80, 100]
+        duration_steps: 30_000_000
+      - name: "mixed"
+        volatility_percentile: [0, 100]
+        duration_steps: 20_000_000
+
+  # Supervised pre-training (optional)
+  pretrain:
+    enabled: false
+    epochs: 10
+    use_historical_winners: true  # Learn from profitable patterns
+
+  # Evaluation
+  eval_freq: 1_000_000  # Evaluate every 1M steps
+  eval_episodes: 100
+
+# Reward Function (Aggressive)
+reward:
+  # Profit maximization
+  profit_multiplier: 2.0
+
+  # Risk penalties (light)
+  drawdown_penalty: 0.3
+  holding_cost: 0.01  # Per step (encourage quick scalps)
+
+  # Bonuses
+  big_win_bonus: 1.5  # Bonus for wins >40 pips
+  big_win_threshold_pips: 40
+  win_streak_bonus: 0.5
+
+  # Losses
+  loss_multiplier: 1.0  # Standard loss penalty
+
+  # Special
+  martingale_enabled: false  # Set true for 2x size on loss (VERY RISKY)
+
+# Risk Management (Max Profit Mode)
+risk:
+  # Position sizing
+  base_lot_per_10k: 1.0  # 1 lot per $10K account
+  max_lot_size: 10.0  # Max 10 lots (10% account)
+  min_lot_size: 0.01
+
+  # Portfolio limits
+  max_concurrent_trades: 5  # Max 5 simultaneous (50% account)
+  max_daily_trades: 50
+
+  # Drawdown limits
+  daily_loss_limit_pct: 40.0  # Stop trading after -40% day
+  max_drawdown_pct: 60.0  # Emergency shutdown at -60%
+
+  # Stop loss / Take profit
+  use_dynamic_stops: true
+  atr_multiplier_sl: 1.5  # Stop loss = 1.5x ATR
+  atr_multiplier_tp: 3.0  # Take profit = 3x ATR
+  trailing_stop_enabled: true
+  trailing_stop_trigger_pips: 30  # Start trailing after +30 pips
+
+  # Spread/slippage
+  max_spread_pips: 2.0  # Don't trade if spread >2 pips
+  expected_slippage_pips: 0.5  # Account for slippage in backtests
+
+# Backtesting
+backtest:
+  # Engine
+  vectorized: true  # GPU-accelerated
+  use_realistic_spread: true
+  use_slippage: true
+
+  # Costs
+  commission_per_lot: 0.0  # Zero commission account
+  spread_pips:
+    EURUSD: 0.8
+    GBPUSD: 1.0
+    USDJPY: 0.7
+
+  # Walk-forward validation
+  walk_forward:
+    enabled: true
+    train_months: 6
+    test_months: 1
+    rolling_step_months: 1
+
+  # Monte Carlo stress testing
+  monte_carlo:
+    enabled: true
+    num_scenarios: 10_000
+    randomize_entries: true
+    randomize_slippage: true
+
+# Live Trading
+live:
+  # MT5 execution
+  mt5:
+    magic_number: 12345  # Unique identifier
+    deviation: 10  # Max price deviation (points)
+    timeout_ms: 5000  # Order timeout
+
+  # Safety
+  paper_trading: true  # Start with paper trading
+  require_confirmation: false  # Auto-trade without confirmation
+
+  # Monitoring
+  telegram:
+    enabled: false
+    bot_token: null
+    chat_id: null
+
+  # Performance tracking
+  log_trades: true
+  log_file: "logs/live_trades.csv"
+
+# Logging
+logging:
+  level: "INFO"  # DEBUG, INFO, WARNING, ERROR
+  console: true
+  file: "logs/tradingengine.log"
+  tensorboard: true
+  tensorboard_dir: "runs"
+
+# Paths
+paths:
+  checkpoints: "checkpoints"
+  models: "models/saved"
+  logs: "logs"
+  data: "data"

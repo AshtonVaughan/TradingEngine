@@ -7,9 +7,9 @@
 
 mt5:
   # Account credentials
-  login: 12345678  # Replace with your MT5 account number
-  password: "your_password_here"  # Replace with your password
-  server: "MetaQuotes-Demo"  # Replace with your broker's server
+  login: 70155284  # Replace with your MT5 account number
+  password: "@g8cQqHr"  # Replace with your password
+  server: "OrbexGlobal-Server"  # Replace with your broker's server
 
   # MT5 terminal path (adjust for your system)
   terminal_path:

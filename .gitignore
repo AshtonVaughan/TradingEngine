@@ -57,8 +57,9 @@ logs/
 runs/
 tensorboard/
 
-# MT5 credentials (NEVER COMMIT!)
-config/mt5_config.yaml
+# MT5 credentials
+# NOTE: mt5_config.yaml is now tracked (credentials will be public on GitHub)
+# Use environment variables in production for security
 .env
 *.key
 *.pem

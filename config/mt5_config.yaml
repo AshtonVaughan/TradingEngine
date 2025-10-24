@@ -1,0 +1,59 @@
+# MetaTrader 5 Configuration Template
+#
+# SETUP INSTRUCTIONS:
+# 1. Copy this file to mt5_config.yaml
+# 2. Fill in your MT5 credentials
+# 3. NEVER commit mt5_config.yaml to git (it's in .gitignore)
+
+mt5:
+  # Account credentials
+  login: 12345678  # Replace with your MT5 account number
+  password: "your_password_here"  # Replace with your password
+  server: "MetaQuotes-Demo"  # Replace with your broker's server
+
+  # MT5 terminal path (adjust for your system)
+  terminal_path:
+    windows: "C:\\Program Files\\MetaTrader 5\\terminal64.exe"
+    linux: "/opt/mt5/terminal64"  # Wine or native if available
+    mac: "/Applications/MetaTrader 5.app/Contents/MacOS/terminal"
+
+  # Connection settings
+  timeout_ms: 60000  # 60 seconds connection timeout
+  retries: 3
+
+# Data collection settings
+data_collection:
+  # Symbols to collect
+  symbols:
+    - "EURUSD"
+    - "GBPUSD"
+    - "USDJPY"
+
+  # Timeframes
+  timeframe: "M1"  # 1-minute bars
+
+  # Historical data range
+  start_date: "2021-01-01"
+  end_date: "2024-12-31"
+
+  # Batch size for API calls
+  batch_size: 100000  # Bars per request (MT5 limit)
+
+  # Storage
+  output_dir: "data/raw/mt5"
+  format: "parquet"  # parquet or csv
+
+# Live data streaming (for production)
+live_streaming:
+  enabled: false
+  symbols:
+    - "EURUSD"
+    - "GBPUSD"
+    - "USDJPY"
+  tick_data: false  # Set true for tick-level data
+  buffer_size: 1000  # Number of ticks/bars to buffer
+
+# API rate limiting
+rate_limit:
+  max_requests_per_second: 10
+  cooldown_on_error_seconds: 5
